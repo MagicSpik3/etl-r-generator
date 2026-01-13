@@ -73,8 +73,17 @@ class RGenerator:
 
     def _gen_load_csv(self, op: Operation):
         target = op.outputs[0]
-        filename = op.outputs[0] 
+        # 🟢 FIX: Use the actual filename param from SPSS, fallback to ID if missing
+        filename = op.parameters.get("filename", op.outputs[0])
+        
+        # Clean up path issues (optional, but safe)
+        # If SPSS had FILE='/data/demo.csv', we might want just 'demo.csv' 
+        # for this flat-folder demo.
+        import os
+        filename = os.path.basename(filename)
+        
         self.lines.append(f'{target} <- read_csv("{filename}")')
+
 
     def _gen_save_binary(self, op: Operation):
         source = op.inputs[0]
