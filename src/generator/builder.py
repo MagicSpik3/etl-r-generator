@@ -4,12 +4,6 @@ from src.ir.types import OpType
 from src.generator.transpiler import RTranspiler
 
 
-
-    # ... existing methods ...
-
-
-
-
 class RGenerator:
     """
     The Master Builder.
@@ -24,13 +18,16 @@ class RGenerator:
         # 🟢 THE DISPATCH TABLE
         # Maps OpType to the method that handles it.
         # This removes the need for giant if/elif chains.
-        self._dispatch_map: Dict[OpType, Callable[[Operation], None]] = {
+        self._dispatch_map = {
             OpType.LOAD_CSV: self._gen_load_csv,
             OpType.SAVE_BINARY: self._gen_save_binary,
             OpType.FILTER: self._gen_filter,
             OpType.SORT: self._gen_sort,
             OpType.JOIN: self._gen_join,
-            OpType.BATCH_COMPUTE: self._gen_batch_compute
+            OpType.BATCH_COMPUTE: self._gen_batch_compute,
+            OpType.MATERIALIZE: self._gen_pass_through,  # <--- NEW!
+            OpType.COMPUTE: self._gen_compute_columns, # <--- NEW
+            OpType.GENERIC: self._gen_generic # <--- Placeholder
         }
 
     def generate(self) -> str:
@@ -131,3 +128,37 @@ class RGenerator:
             self.lines.append(f"    {var_name} = {expr}{separator}")
             
         self.lines.append("  )")        
+
+
+    def _gen_pass_through(self, op: Operation):
+        """
+        Handles MATERIALIZE or EXECUTE nodes.
+        In R, this is just a variable assignment to keep the lineage intact.
+        ds_next <- ds_prev
+        """
+        target = op.outputs[0]
+        source = op.inputs[0]
+        self.lines.append(f"{target} <- {source}")
+
+    def _gen_compute_columns(self, op: Operation):
+        """
+        Handles a standalone COMPUTE that wasn't merged into a batch.
+        """
+        target = op.outputs[0]
+        source = op.inputs[0]
+        
+        # Get params
+        var_name = op.parameters.get("target")
+        raw_expr = op.parameters.get("expression")
+        expr = self.transpiler.transpile(raw_expr)
+        
+        self.lines.append(f"{target} <- {source} %>% mutate({var_name} = {expr})")
+
+    def _gen_generic(self, op: Operation):
+        """
+        Fallback for things SpecGen couldn't fully parse (like complex IFs).
+        We just comment it out so the script doesn't crash.
+        """
+        cmd = op.parameters.get("command", "UNKNOWN")
+        self.lines.append(f"# WARNING: Generic command '{cmd}' not fully supported yet.")
+        self.lines.append(f"# {op.outputs[0]} <- {op.inputs[0]}")

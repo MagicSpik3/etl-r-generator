@@ -1,39 +1,64 @@
 metadata:
-  source: hello_world.sps
-  timestamp: '2026-01-13T12:00:00'
+  generator: SpecGen v0.1
+  source_type: SPSS
 datasets:
-- id: raw_data.csv
+- id: source_raw_data.csv
   source: file
   columns: []
-- id: ds_step2
+- id: ds_002_derived
   source: derived
-  columns: []
-- id: final_output.csv
+  columns:
+  - name: x
+    type: integer
+  - name: y
+    type: integer
+- id: ds_003_materialized
+  source: derived
+  columns:
+  - name: x
+    type: integer
+  - name: y
+    type: integer
+- id: file_final_output.csv
   source: file
-  columns: []
+  columns:
+  - name: x
+    type: integer
+  - name: y
+    type: integer
 operations:
-- id: op_load
+- id: op_001_load
   type: load_csv
   inputs: []
   outputs:
-  - raw_data.csv
-  parameters: {}
-- id: batch_op_calc_x
+  - source_raw_data.csv
+  parameters:
+    filename: raw_data.csv
+    format: TXT
+- id: batch_op_002_compute
   type: batch_compute
   inputs:
-  - raw_data.csv
+  - source_raw_data.csv
   outputs:
-  - ds_step2
+  - ds_002_derived
   parameters:
     computes:
     - target: x
       expression: val1 + val2
     - target: y
       expression: x * 2
-- id: op_save
+- id: op_004_exec
+  type: materialize
+  inputs:
+  - ds_002_derived
+  outputs:
+  - ds_003_materialized
+  parameters: {}
+- id: op_005_save
   type: save_binary
   inputs:
-  - ds_step2
+  - ds_003_materialized
   outputs:
-  - final_output.csv
-  parameters: {}
+  - file_final_output.csv
+  parameters:
+    filename: final_output.csv
