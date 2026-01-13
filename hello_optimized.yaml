@@ -1,0 +1,39 @@
+metadata:
+  source: hello_world.sps
+  timestamp: '2026-01-13T12:00:00'
+datasets:
+- id: raw_data.csv
+  source: file
+  columns: []
+- id: ds_step2
+  source: derived
+  columns: []
+- id: final_output.csv
+  source: file
+  columns: []
+operations:
+- id: op_load
+  type: load_csv
+  inputs: []
+  outputs:
+  - raw_data.csv
+  parameters: {}
+- id: batch_op_calc_x
+  type: batch_compute
+  inputs:
+  - raw_data.csv
+  outputs:
+  - ds_step2
+  parameters:
+    computes:
+    - target: x
+      expression: val1 + val2
+    - target: y
+      expression: x * 2
+- id: op_save
+  type: save_binary
+  inputs:
+  - ds_step2
+  outputs:
+  - final_output.csv
+  parameters: {}
