@@ -1,6 +1,6 @@
 import pytest
 from etl_ir.model import Pipeline
-from src.generator.builder import RGenerator
+from etl_r_generator.builder import RGenerator
 
 class TestRStructure:
     

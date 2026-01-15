@@ -1,5 +1,5 @@
 import pytest
-from src.generator.transpiler import RTranspiler
+from etl_r_generator.transpiler import RTranspiler
 
 class TestRTranspiler:
     

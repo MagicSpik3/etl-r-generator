@@ -1,7 +1,7 @@
 import pytest
 from etl_ir.model import Pipeline, Operation
 from etl_ir.types import OpType
-from src.generator.builder import RGenerator
+from etl_r_generator.builder import RGenerator
 
 class TestRBatchCompute:
     

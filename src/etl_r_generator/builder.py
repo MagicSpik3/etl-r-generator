@@ -1,7 +1,7 @@
 from typing import List, Dict, Callable
 from etl_ir.model import Pipeline, Operation
 from etl_ir.types import OpType
-from src.generator.transpiler import RTranspiler
+from etl_r_generator.transpiler import RTranspiler
 
 
 class RGenerator:
