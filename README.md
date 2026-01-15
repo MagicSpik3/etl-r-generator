@@ -1,8 +1,6 @@
-# ETL R Generator
+# 📉 ETL R-Generator
 
-![Status](https://img.shields.io/badge/status-phase--1-blue) ![Target](https://img.shields.io/badge/target-R_%2F_Tidyverse-blue)
-
-> **The Backend Compiler: Turning Logic into Code.**
+The "Backend" of the compiler. It translates the Optimized IR Pipeline into production-grade R scripts.
 
 This is the final stage of the ETL Compiler pipeline. It consumes the **Optimized Logical IR** (produced by `etl-optimizer`) and synthesizes idiomatic, human-readable R scripts.
 
