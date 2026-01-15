@@ -1,4 +1,14 @@
-pydantic>=2.0.0
-pyyaml>=6.0
-pytest>=7.0.0
-pytest-cov>=4.0.0
+annotated-types==0.7.0
+coverage==7.13.1
+-e git+https://github.com/MagicSpik3/etl-ir-core@3ccf15ee9fb4f36ae52e0a7c04bf51977205b51b#egg=etl_ir_core
+iniconfig==2.3.0
+packaging==25.0
+pluggy==1.6.0
+pydantic==2.12.5
+pydantic_core==2.41.5
+Pygments==2.19.2
+pytest==9.0.2
+pytest-cov==7.0.0
+PyYAML==6.0.3
+typing-inspection==0.4.2
+typing_extensions==4.15.0

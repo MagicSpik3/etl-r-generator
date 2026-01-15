@@ -1,6 +1,6 @@
 import pytest
-from src.ir.model import Pipeline, Operation
-from src.ir.types import OpType
+from etl_ir.model import Pipeline, Operation
+from etl_ir.types import OpType
 from src.generator.builder import RGenerator
 
 class TestFilenameHandling:

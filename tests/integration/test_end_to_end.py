@@ -1,6 +1,6 @@
 import pytest
-from src.ir.model import Pipeline, Operation
-from src.ir.types import OpType
+from etl_ir.model import Pipeline, Operation
+from etl_ir.types import OpType
 from src.generator.builder import RGenerator
 
 class TestEndToEnd:
@@ -30,7 +30,7 @@ class TestEndToEnd:
             # 3. Filter
             Operation(
                 id="op3",
-                type=OpType.FILTER,
+                type=OpType.FILTER_ROWS,
                 inputs=["derived"],
                 outputs=["filtered"],
                 parameters={"condition": "is_valid = 0"} # 0 = False in old system

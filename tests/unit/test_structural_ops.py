@@ -1,6 +1,6 @@
 import pytest
-from src.ir.model import Pipeline, Operation
-from src.ir.types import OpType
+from etl_ir.model import Pipeline, Operation
+from etl_ir.types import OpType
 from src.generator.builder import RGenerator
 
 class TestRStructuralOps:
@@ -14,7 +14,7 @@ class TestRStructuralOps:
         ops = [
             Operation(
                 id="filter_op", 
-                type=OpType.FILTER, 
+                type=OpType.FILTER_ROWS, 
                 inputs=["ds1"], 
                 outputs=["ds2"], 
                 parameters={"condition": "age > 18"}
@@ -36,7 +36,7 @@ class TestRStructuralOps:
         ops = [
             Operation(
                 id="sort_op", 
-                type=OpType.SORT, 
+                type=OpType.SORT_ROWS, 
                 inputs=["ds1"], 
                 outputs=["ds2"], 
                 parameters={"keys": "age, date"}

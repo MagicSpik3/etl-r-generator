@@ -1,5 +1,5 @@
 import pytest
-from src.ir.model import Pipeline
+from etl_ir.model import Pipeline
 from src.generator.builder import RGenerator
 
 class TestRStructure:

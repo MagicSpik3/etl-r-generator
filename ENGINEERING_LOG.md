@@ -53,8 +53,8 @@ The core complexity is translating SPSS/Generic formulas into R.
 
 ### Phase 2: The Verbs (Structural Ops)
 
-* [ ] **Test 2.1:** Generate `dplyr::filter()` from `OpType.FILTER`.
-* [ ] **Test 2.2:** Generate `dplyr::arrange()` from `OpType.SORT`.
+* [ ] **Test 2.1:** Generate `dplyr::filter()` from `OpType.FILTER_ROWS`.
+* [ ] **Test 2.2:** Generate `dplyr::arrange()` from `OpType.SORT_ROWS`.
 * [ ] **Test 2.3:** Generate `dplyr::inner_join()` from `OpType.JOIN`.
 * [ ] **Test 2.4:** Generate `dplyr::summarise()` from `OpType.AGGREGATE`.
 

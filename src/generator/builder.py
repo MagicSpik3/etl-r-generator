@@ -1,6 +1,6 @@
 from typing import List, Dict, Callable
-from src.ir.model import Pipeline, Operation
-from src.ir.types import OpType
+from etl_ir.model import Pipeline, Operation
+from etl_ir.types import OpType
 from src.generator.transpiler import RTranspiler
 
 
@@ -21,13 +21,13 @@ class RGenerator:
         self._dispatch_map = {
             OpType.LOAD_CSV: self._gen_load_csv,
             OpType.SAVE_BINARY: self._gen_save_binary,
-            OpType.FILTER: self._gen_filter,
-            OpType.SORT: self._gen_sort,
+            OpType.FILTER_ROWS: self._gen_filter,
+            OpType.SORT_ROWS: self._gen_sort,
             OpType.JOIN: self._gen_join,
             OpType.BATCH_COMPUTE: self._gen_batch_compute,
             OpType.MATERIALIZE: self._gen_pass_through,  # <--- NEW!
-            OpType.COMPUTE: self._gen_compute_columns, # <--- NEW
-            OpType.GENERIC: self._gen_generic # <--- Placeholder
+            OpType.COMPUTE_COLUMNS: self._gen_compute_columns, # <--- NEW
+            OpType.GENERIC_TRANSFORM: self._gen_generic # <--- Placeholder
         }
 
     def generate(self) -> str:
