@@ -1,8 +1,8 @@
 from typing import List, Dict, Callable
 from etl_ir.model import Pipeline, Operation
-from etl_ir.types import DataType, OpType
+from etl_ir.types import OpType
 from etl_r_generator.transpiler import RTranspiler
-import os
+
 
 class RGenerator:
     """
@@ -16,6 +16,8 @@ class RGenerator:
         self.transpiler = RTranspiler()
         
         # 🟢 THE DISPATCH TABLE
+        # Maps OpType to the method that handles it.
+        # This removes the need for giant if/elif chains.
         self._dispatch_map = {
             OpType.LOAD_CSV: self._gen_load_csv,
             OpType.SAVE_BINARY: self._gen_save_binary,
@@ -23,11 +25,9 @@ class RGenerator:
             OpType.SORT_ROWS: self._gen_sort,
             OpType.JOIN: self._gen_join,
             OpType.BATCH_COMPUTE: self._gen_batch_compute,
-            OpType.MATERIALIZE: self._gen_pass_through,
-            OpType.COMPUTE_COLUMNS: self._gen_compute_columns,
-            OpType.GENERIC_TRANSFORM: self._gen_generic,
-            # Fallback for old op names if necessary
-            OpType.AGGREGATE: self._gen_generic 
+            OpType.MATERIALIZE: self._gen_pass_through,  # <--- NEW!
+            OpType.COMPUTE_COLUMNS: self._gen_compute_columns, # <--- NEW
+            OpType.GENERIC_TRANSFORM: self._gen_generic # <--- Placeholder
         }
 
     def generate(self) -> str:
@@ -50,22 +50,40 @@ class RGenerator:
         self.lines.append("")
 
     def _add_body(self):
+        """
+        Iterates through operations and dispatches to the correct handler.
+        """
         for op in self.pipeline.operations:
             self.lines.append(f"# Op: {op.id}")
+            
+            # 🟢 The "Visitor" Logic
+            # Look up the handler in the table
             handler = self._dispatch_map.get(op.type)
+            
             if handler:
+                # Execute the handler
                 handler(op)
             else:
+                # Graceful fallback for unimplemented ops
                 self.lines.append(f"# WARNING: No generator implemented for {op.type}")
+                
             self.lines.append("")
 
     # --- Handlers ---
 
     def _gen_load_csv(self, op: Operation):
         target = op.outputs[0]
+        # 🟢 FIX: Use the actual filename param from SPSS, fallback to ID if missing
         filename = op.parameters.get("filename", op.outputs[0])
+        
+        # Clean up path issues (optional, but safe)
+        # If SPSS had FILE='/data/demo.csv', we might want just 'demo.csv' 
+        # for this flat-folder demo.
+        import os
         filename = os.path.basename(filename)
+        
         self.lines.append(f'{target} <- read_csv("{filename}")')
+
 
     def _gen_save_binary(self, op: Operation):
         source = op.inputs[0]
@@ -90,6 +108,8 @@ class RGenerator:
         left = op.inputs[0]
         right = op.inputs[1] if len(op.inputs) > 1 else "ERROR_MISSING_INPUT"
         self.lines.append(f"{target} <- {left} %>% inner_join({right})")
+
+
     
     def _gen_batch_compute(self, op: Operation):
         target = op.outputs[0]
@@ -97,33 +117,57 @@ class RGenerator:
         computes = op.parameters.get("computes", [])
         
         if not computes:
+            # If empty batch, just assign
             self.lines.append(f"{target} <- {source}")
             return
 
         self.lines.append(f"{target} <- {source} %>%")
         self.lines.append("  mutate(")
+        
+        # Iterate through the batch list
         for i, comp in enumerate(computes):
             var_name = comp.get("target")
             raw_expr = comp.get("expression")
+            
+            # 🟢 Transpile the expression logic!
             expr = self.transpiler.transpile(raw_expr)
+            
+            # Add comma if not the last item
             separator = "," if i < len(computes) - 1 else ""
             self.lines.append(f"    {var_name} = {expr}{separator}")
+            
         self.lines.append("  )")        
 
+
     def _gen_pass_through(self, op: Operation):
+        """
+        Handles MATERIALIZE or EXECUTE nodes.
+        In R, this is just a variable assignment to keep the lineage intact.
+        ds_next <- ds_prev
+        """
         target = op.outputs[0]
         source = op.inputs[0]
         self.lines.append(f"{target} <- {source}")
 
     def _gen_compute_columns(self, op: Operation):
+        """
+        Handles a standalone COMPUTE that wasn't merged into a batch.
+        """
         target = op.outputs[0]
         source = op.inputs[0]
+        
+        # Get params
         var_name = op.parameters.get("target")
         raw_expr = op.parameters.get("expression")
         expr = self.transpiler.transpile(raw_expr)
+        
         self.lines.append(f"{target} <- {source} %>% mutate({var_name} = {expr})")
 
     def _gen_generic(self, op: Operation):
+        """
+        Fallback for things SpecGen couldn't fully parse (like complex IFs).
+        We just comment it out so the script doesn't crash.
+        """
         cmd = op.parameters.get("command", "UNKNOWN")
         self.lines.append(f"# WARNING: Generic command '{cmd}' not fully supported yet.")
         self.lines.append(f"# {op.outputs[0]} <- {op.inputs[0]}")
