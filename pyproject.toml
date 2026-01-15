@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "etl_r_generator"
+version = "0.1.0"
+description = "R Transpiler backend for the Enterprise ETL Compiler"
+dependencies = [
+    "etl-ir-core",
+    "pydantic>=2.0",
+    "jinja2" # Often used for generation, include if relevant
+]
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["src"]
