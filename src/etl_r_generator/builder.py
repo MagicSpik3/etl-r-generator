@@ -26,8 +26,8 @@ class RGenerator:
             OpType.MATERIALIZE: self._gen_pass_through,
             OpType.COMPUTE_COLUMNS: self._gen_compute_columns,
             OpType.GENERIC_TRANSFORM: self._gen_generic,
-            # Fallback for old op names if necessary
-            OpType.AGGREGATE: self._gen_generic 
+            # 🟢 FIX: Point to the new dedicated handler!
+            OpType.AGGREGATE: self._gen_aggregate 
         }
 
     def generate(self) -> str:
@@ -67,9 +67,12 @@ class RGenerator:
         filename = os.path.basename(filename)
         self.lines.append(f'{target} <- read_csv("{filename}")')
 
+
     def _gen_save_binary(self, op: Operation):
         source = op.inputs[0]
-        filename = op.outputs[0]
+        # 🟢 FIX: Check parameters for the real filename first!
+        # Fallback to outputs[0] only if parameter is missing.
+        filename = op.parameters.get("filename", op.outputs[0])
         self.lines.append(f'write_csv({source}, "{filename}")')
 
     def _gen_filter(self, op: Operation):
@@ -127,3 +130,45 @@ class RGenerator:
         cmd = op.parameters.get("command", "UNKNOWN")
         self.lines.append(f"# WARNING: Generic command '{cmd}' not fully supported yet.")
         self.lines.append(f"# {op.outputs[0]} <- {op.inputs[0]}")
+
+    # 🟢 NEW HANDLER
+    def _gen_aggregate(self, op: Operation):
+        target = op.outputs[0]
+        source = op.inputs[0]
+        
+        # 1. Get parameters
+        break_vars = op.parameters.get('break', [])
+        aggs = op.parameters.get('aggregations', [])
+        
+        # 2. Build group_by string
+        group_str = ", ".join(break_vars)
+        
+        # 3. Build summarise string
+        r_aggs = []
+        for agg in aggs:
+            if "=" in agg:
+                col_name, expr = agg.split("=", 1)
+                clean_expr = expr.strip()
+                # Basic Mapping
+                clean_expr = clean_expr.replace("MEAN(", "mean(")
+                clean_expr = clean_expr.replace("SUM(", "sum(")
+                clean_expr = clean_expr.replace("MAX(", "max(")
+                clean_expr = clean_expr.replace("MIN(", "min(")
+                
+                # Safety check for NA handling
+                if "(" in clean_expr and ", na.rm" not in clean_expr:
+                    clean_expr = clean_expr.replace(")", ", na.rm = TRUE)")
+                
+                r_aggs.append(f"{col_name.strip()} = {clean_expr}")
+        
+        summarize_str = ", ".join(r_aggs)
+        
+        # 4. Generate Code
+        self.lines.append(f"{target} <- {source} %>%")
+        if group_str:
+            self.lines.append(f"  group_by({group_str}) %>%")
+        
+        if not r_aggs:
+             self.lines.append(f"  distinct({group_str})")
+        else:
+             self.lines.append(f"  summarise({summarize_str})")
