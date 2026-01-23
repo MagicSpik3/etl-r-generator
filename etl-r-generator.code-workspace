@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"workbench.colorTheme": "Default High Contrast"
+	},
+	"workbench.colorCustomizations": {
+		"window.activeBorder": "#ffff00",
+		"window.inactiveBorder": "#ffff80"
+	}
+	
+}
