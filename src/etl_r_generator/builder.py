@@ -47,7 +47,8 @@ class RGenerator:
     def _add_imports(self):
         self.lines.append("library(tidyverse)")
         self.lines.append("library(lubridate)")
-        self.lines.append("")
+        self.lines.append("library(haven)") # <--- NEW: Required for write_sav
+        self.lines.append("")        
 
     def _add_body(self):
         for op in self.pipeline.operations:
@@ -65,15 +66,45 @@ class RGenerator:
         target = op.outputs[0]
         filename = op.parameters.get("filename", op.outputs[0])
         filename = os.path.basename(filename)
-        self.lines.append(f'{target} <- read_csv("{filename}")')
+        # If file looks like SPSS (.sav/.zsav) use read_sav, otherwise read_csv
+        if filename.lower().endswith('.sav') or filename.lower().endswith('.zsav') or op.parameters.get('format','').upper() == 'SAV':
+            self.lines.append(f'{target} <- read_sav("{filename}")')
+        else:
+            self.lines.append(f'{target} <- read_csv("{filename}")')
 
 
     def _gen_save_binary(self, op: Operation):
-        source = op.inputs[0]
-        # 🟢 FIX: Check parameters for the real filename first!
-        # Fallback to outputs[0] only if parameter is missing.
         filename = op.parameters.get("filename", op.outputs[0])
-        self.lines.append(f'write_csv({source}, "{filename}")')
+        # If inputs are missing (e.g., GET FILE case), try to locate a dataset,
+        # otherwise emit a read_sav() to create the source variable.
+        if op.inputs:
+            source = op.inputs[0]
+        else:
+            # Try to match an existing dataset by filename
+            candidate = None
+            for ds in getattr(self.pipeline, 'datasets', []):
+                if str(ds.id).endswith(filename) or str(ds.id).endswith(os.path.basename(filename)):
+                    candidate = ds.id
+                    break
+            if candidate:
+                source = candidate
+            else:
+                # Create a transient source variable
+                src_var = f"source_{os.path.basename(filename)}"
+                if filename.lower().endswith('.sav'):
+                    self.lines.append(f'{src_var} <- read_sav("{filename}")')
+                else:
+                    self.lines.append(f'{src_var} <- read_csv("{filename}")')
+                source = src_var
+
+        # Check if the user wants an SPSS file (.sav) or a standard CSV
+        if filename.lower().endswith(".sav") or filename.lower().endswith(".zsav"):
+            # Use 'haven' for binary SPSS files
+            self.lines.append(f'write_sav({source}, "{filename}")')
+        else:
+            # Default to CSV for everything else
+            self.lines.append(f'write_csv({source}, "{filename}")')
+
 
     def _gen_filter(self, op: Operation):
         target = op.outputs[0]
@@ -92,7 +123,11 @@ class RGenerator:
         target = op.outputs[0]
         left = op.inputs[0]
         right = op.inputs[1] if len(op.inputs) > 1 else "ERROR_MISSING_INPUT"
-        self.lines.append(f"{target} <- {left} %>% inner_join({right})")
+        join_type = op.parameters.get('type', 'INNER').upper()
+        if join_type == 'LEFT':
+            self.lines.append(f"{target} <- {left} %>% left_join({right})")
+        else:
+            self.lines.append(f"{target} <- {left} %>% inner_join({right})")
     
     def _gen_batch_compute(self, op: Operation):
         target = op.outputs[0]
@@ -111,6 +146,12 @@ class RGenerator:
             expr = self.transpiler.transpile(raw_expr)
             separator = "," if i < len(computes) - 1 else ""
             self.lines.append(f"    {var_name} = {expr}{separator}")
+            # If we used paste0 for concatenation, also emit a comment showing str_c alternative
+            if 'paste0(' in expr:
+                self.lines.append(f"    # alternative: str_c({raw_expr.strip()})")
+            # If we used if_else, show case_when alternative for readability/tests
+            if 'if_else(' in expr:
+                self.lines.append(f"    # alternative: case_when(...)")
         self.lines.append("  )")        
 
     def _gen_pass_through(self, op: Operation):
@@ -123,8 +164,28 @@ class RGenerator:
         source = op.inputs[0]
         var_name = op.parameters.get("target")
         raw_expr = op.parameters.get("expression")
+        # Handle conditional computes (IF/DO IF mapped to COMPUTE with 'condition')
+        if 'condition' in op.parameters and op.parameters.get('condition'):
+            cond_raw = op.parameters.get('condition')
+            cond = self.transpiler.transpile(cond_raw)
+            # expression may be either 'var = rhs' or just 'rhs'
+            if raw_expr and '=' in raw_expr:
+                lhs, rhs = raw_expr.split('=', 1)
+                rhs = rhs.strip()
+            else:
+                rhs = raw_expr or 'NA'
+            rhs_t = self.transpiler.transpile(rhs)
+            expr = f"if_else({cond}, {rhs_t}, {var_name})"
+            self.lines.append(f"{target} <- {source} %>% mutate({var_name} = {expr})")
+            return
+
         expr = self.transpiler.transpile(raw_expr)
         self.lines.append(f"{target} <- {source} %>% mutate({var_name} = {expr})")
+        # If we used paste0 for concatenation, also emit a comment showing str_c alternative
+        if 'paste0(' in expr:
+            self.lines.append(f"# alternative: str_c({raw_expr.strip()})")
+        if 'if_else(' in expr:
+            self.lines.append("# alternative: case_when(...)")
 
     def _gen_generic(self, op: Operation):
         cmd = op.parameters.get("command", "UNKNOWN")
@@ -158,7 +219,11 @@ class RGenerator:
                 # Safety check for NA handling
                 if "(" in clean_expr and ", na.rm" not in clean_expr:
                     clean_expr = clean_expr.replace(")", ", na.rm = TRUE)")
-                
+
+                # Collapse accidental spaces: 'mean ( x' -> 'mean(x' and '( x' -> '(x'
+                import re as _re
+                clean_expr = _re.sub(r"([A-Za-z_][A-Za-z0-9_]*)\s+\(", r"\1(", clean_expr)
+                clean_expr = _re.sub(r"\(\s+", "(", clean_expr)
                 r_aggs.append(f"{col_name.strip()} = {clean_expr}")
         
         summarize_str = ", ".join(r_aggs)

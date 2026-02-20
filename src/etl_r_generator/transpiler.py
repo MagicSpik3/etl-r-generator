@@ -25,6 +25,8 @@ class RTranspiler:
             (r"TRUNC\(", "floor("),
             (r"RND\(", "round("),
             (r"ABS\(", "abs("),
+            # String concatenation
+            (r"CONCAT\(", "paste0("),
         ]
 
     def transpile(self, expression: str) -> str:
