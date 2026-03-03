@@ -21,12 +21,13 @@ class RTranspiler:
             # Constants
             (r"\$SYSMIS", "NA"),
             
-            # Math Functions
-            (r"TRUNC\(", "floor("),
-            (r"RND\(", "round("),
-            (r"ABS\(", "abs("),
+            # Math Functions (with optional spaces around parens)
+            (r"TRUNC\s*\(", "floor("),
+            (r"RND\s*\(", "round("),
+            (r"ABS\s*\(", "abs("),
+            (r"LAG\s*\(", "lag("),
             # String concatenation
-            (r"CONCAT\(", "paste0("),
+            (r"CONCAT\s*\(", "paste0("),
         ]
 
     def transpile(self, expression: str) -> str:
@@ -37,6 +38,10 @@ class RTranspiler:
             return "NA"
 
         result = expression
+
+        # 0. Normalize spaces around parentheses in function arguments
+        # This handles cases like "lag ( val )" -> "lag (val)" to make regex matching work
+        result = self._normalize_function_calls(result)
 
         # 1. Apply Regex Replacements
         for pattern, replacement in self.replacements:
@@ -49,12 +54,28 @@ class RTranspiler:
 
         return result.strip()
 
+    def _normalize_function_calls(self, expr: str) -> str:
+        """
+        Normalize spacing around function call parentheses.
+        Converts "func ( arg )" to "func(arg)" for cleaner processing.
+        Also normalizes spaces inside parentheses for consistency.
+        """
+        # Remove spaces between function name and opening paren
+        expr = re.sub(r'(\w+)\s+\(', r'\1(', expr)
+        # Remove spaces immediately after opening paren
+        expr = re.sub(r'\(\s+', '(', expr)
+        # Remove spaces immediately before closing paren (but preserve space before operators)
+        expr = re.sub(r'\s+\)', ')', expr)
+        # Normalize spaces around commas in arguments: multiple spaces -> single space after comma
+        expr = re.sub(r'\s*,\s*', ', ', expr)
+        return expr
+
     def _handle_mod(self, expr: str) -> str:
         """
         SPSS: MOD(a, b) -> R: a %% b
         """
-        # Pattern: MOD(arg1, arg2)
-        pattern = r"MOD\(([^,]+),\s*([^)]+)\)"
+        # Pattern: MOD(arg1, arg2) - handles spaces
+        pattern = r"mod\s*\(([^,]+),\s*([^)]+)\)"
         
         def replace_mod(match):
             a = match.group(1).strip()
@@ -67,7 +88,7 @@ class RTranspiler:
         """
         SPSS: DATE.MDY(m, d, y) -> R: make_date(year=y, month=m, day=d)
         """
-        pattern = r"DATE\.MDY\(([^,]+),\s*([^,]+),\s*([^)]+)\)"
+        pattern = r"date\.mdy\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\)"
         
         def replace_date(match):
             m = match.group(1).strip()
@@ -81,4 +102,4 @@ class RTranspiler:
         """
         SPSS: SYSMIS(x) -> R: is.na(x)
         """
-        return re.sub(r"SYSMIS\(", "is.na(", expr, flags=re.IGNORECASE)
+        return re.sub(r"sysmis\s*\(", "is.na(", expr, flags=re.IGNORECASE)
